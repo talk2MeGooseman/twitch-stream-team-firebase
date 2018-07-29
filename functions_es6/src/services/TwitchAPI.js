@@ -54,8 +54,10 @@ export async function publishChannelMessage(channel_id, secret) {
 }
 
 export async function getChannelsTeam(channel_id) {
+  let response;
+
   try {
-    let response = await axios({
+    response = await axios({
       method: 'GET',
       url: `https://api.twitch.tv/kraken/channels/${channel_id}/teams`,
       headers: {
@@ -63,16 +65,17 @@ export async function getChannelsTeam(channel_id) {
         "Accept": "application/vnd.twitchtv.v5+json",
       }
     });
-    return response.data;
   } catch (error) {
     console.error('Get Channel Team Error:', error);
   }
 
+  return response.data;
 }
 
 export async function getTeamInfo(team_name) {
+  let response;
   try {
-    let response = await axios({
+    response = await axios({
       method: 'GET',
       url: `https://api.twitch.tv/kraken/teams/${team_name}`,
       headers: {
@@ -80,10 +83,9 @@ export async function getTeamInfo(team_name) {
         "Accept": "application/vnd.twitchtv.v5+json",
       }
     });
-
-    return response.data;
   } catch (error) {
     console.error('Get Team Info Error:', error);
   }
 
+  return response.data;
 }
