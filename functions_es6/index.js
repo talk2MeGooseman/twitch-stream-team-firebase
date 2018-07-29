@@ -33,7 +33,7 @@ exports.get_panel_information = functions.https.onRequest((req, res) => {
     try {
       // Only decode token, no need to verify if its from broadcaster
       decoded_token = decodeToken(token, SECRET);
-      decoded_token.channel_id = "7676884";
+      // decoded_token.channel_id = "7676884";
       // decoded_token.channel_id = "146431491";
     } catch (err) {
       console.error("JWT was invalid", err);
