@@ -5,7 +5,7 @@ import {
   EXTENSION_VERSION,
   CONFIG_KEY,
 } from "../Constants";
-import { signToken } from "./AuthToken";
+import { signToken } from "./TokenUtil";
 
 export async function setExtensionConfigured(channel_id, secret, version=EXTENSION_VERSION) {
   const token = signToken(secret);
@@ -51,4 +51,39 @@ export async function publishChannelMessage(channel_id, secret) {
   } catch (error) {
     console.error('PubSub Message failed', error);
   }
+}
+
+export async function getChannelsTeam(channel_id) {
+  try {
+    let response = await axios({
+      method: 'GET',
+      url: `https://api.twitch.tv/kraken/channels/${channel_id}/teams`,
+      headers: {
+        'Client-id': EXTENSION_ID,
+        "Accept": "application/vnd.twitchtv.v5+json",
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Get Channel Team Error:', error);
+  }
+
+}
+
+export async function getTeamInfo(team_name) {
+  try {
+    let response = await axios({
+      method: 'GET',
+      url: `https://api.twitch.tv/kraken/teams/${team_name}`,
+      headers: {
+        'Client-id': EXTENSION_ID,
+        "Accept": "application/vnd.twitchtv.v5+json",
+      }
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error('Get Team Info Error:', error);
+  }
+
 }
