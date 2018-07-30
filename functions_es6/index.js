@@ -1,9 +1,8 @@
 const functions = require("firebase-functions");
 const admin = require('firebase-admin');
 import {
-  publishChannelMessage,
   getChannelsTeam,
-  getTeamInfo,
+  getLiveChannels,
 } from "./src/services/TwitchAPI";
 import {
   verifyToken,
@@ -17,8 +16,13 @@ import {
   refreshChannelTeams,
   updateChannelInfo,
   setChannelInfo,
+  queryTeamLiveChannels,
+  setTeamLiveChannels,
 } from "./src/Firebase";
+import { shouldRefresh } from "./src/Helpers";
 require('dotenv').config()
+
+// decoded_token.channel_id = "7676884";
 
 admin.initializeApp(functions.config().firebase);
 let db = admin.firestore();
@@ -46,8 +50,6 @@ exports.get_panel_information = functions.https.onRequest((req, res) => {
     {
       // Only decode token, no need to verify if its from broadcaster
       decoded_token = decodeToken(token, SECRET);
-      decoded_token.channel_id = "7676884";
-      // decoded_token.channel_id = "146431491";
     } catch (err)
     {
       console.error("JWT was invalid", err);
@@ -135,7 +137,6 @@ exports.set_panel_information = functions.https.onRequest((req, res) => {
     // Verify if token is valid, belongs to broadcaster and decode
     try {
       decoded_token = verifyToken(token, SECRET);
-      decoded_token.channel_id = "7676884";
     } catch (err) {
       console.error("JWT was invalid", err);
       res.status(401).json({});
@@ -169,5 +170,58 @@ exports.set_panel_information = functions.https.onRequest((req, res) => {
       console.error('Could not find channel', decoded_token.channel_id, 'selected team', selected_team);
       res.status(404).end();
     }
+  });
+});
+
+
+exports.get_live_channels = functions.https.onRequest((req, res) => {
+  // Need to use CORS for Twitch
+  cors(req, res, async () => {
+    let decoded_token;
+
+    // Get JWT from header
+    const token = req.get("x-extension-jwt");
+
+    // Verify if token is valid, belongs to broadcaster and decode
+    try {
+      decoded_token = verifyToken(token, SECRET);
+    } catch (err) {
+      console.error("JWT was invalid", err);
+      res.status(401).json({});
+      return;
+    }
+
+    // Get document for channel_id from collection
+    let channelInfo = await queryChannelInfo(db, decoded_token.channel_id);
+
+    if (!channelInfo) {
+      res.status(404).end();
+      return;
+    }
+
+    let teamInfo = await queryTeamInfo(db, channelInfo.selected_team);
+
+    // Create an array of live channel ids
+    let channelIds = teamInfo.users.map((channel) => channel._id);
+
+    // Extra param for testing
+    if (req.query.channel_id) {
+      channelIds.push(req.query.channel_id);
+    }
+
+    // Query for live channels for team from db
+    let liveChannelsData = await queryTeamLiveChannels(db, teamInfo.name);
+
+    // check if live channels for team is stale
+    if (liveChannelsData && shouldRefresh( liveChannelsData.refresh_at)) {
+      // Refresh data before responding back
+      liveChannelsData = await getLiveChannels(channelIds);
+      await setTeamLiveChannels(db, teamInfo.name, liveChannelsData)
+    } else if(!liveChannelsData) {
+      liveChannelsData = await getLiveChannels(channelIds);
+      await setTeamLiveChannels(db, teamInfo.name, liveChannelsData)
+    }
+
+    res.json(liveChannelsData);
   });
 });

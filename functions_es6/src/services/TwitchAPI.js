@@ -89,3 +89,27 @@ export async function getTeamInfo(team_name) {
 
   return response.data;
 }
+
+export async function getLiveChannels(channels) {
+  console.info('Check if any of the following channels are live', channels);
+  let channelArgs = channels.map((channel_id) => {
+    return `user_id=${channel_id}`;
+  });
+
+  let channelParams = channelArgs.join('&'); 
+
+  let response;
+  try {
+    response = await axios({
+      method: 'GET',
+      url: `https://api.twitch.tv/helix/streams?first=100&${channelParams}`,
+      headers: {
+        'Client-id': EXTENSION_ID,
+      }
+    });
+  } catch (error) {
+    console.error('Get live channel error:', error);
+  }
+
+  return response.data;
+}

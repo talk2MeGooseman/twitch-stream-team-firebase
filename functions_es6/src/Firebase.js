@@ -87,3 +87,23 @@ export const queryChannelInfo = async (db, channel_id) => {
 
   return doc.data();
 }
+
+export const queryTeamLiveChannels = async (db, teamName) => {
+  // Get document for team from collection
+  const docRef = db.collection("team_live_channels").doc(teamName);
+
+  let doc = await docRef.get();
+  console.info("Fetch team live channels", teamName);
+
+  return doc.data();
+}
+
+export const setTeamLiveChannels = async (db, teamName, data) => {
+  // Get document for team from collection
+  const docRef = db.collection("team_live_channels").doc(teamName);
+  // Set refresh time stamp
+  data.refresh_at = Date.now();
+  // Set the team live channels info
+  await docRef.set(data);
+  console.info("Set team live channel info for", teamName);
+}
