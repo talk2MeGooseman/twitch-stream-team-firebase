@@ -184,7 +184,7 @@ exports.get_live_channels = functions.https.onRequest((req, res) => {
 
     // Verify if token is valid, belongs to broadcaster and decode
     try {
-      decoded_token = verifyToken(token, SECRET);
+      decoded_token = decodeToken(token, SECRET);
     } catch (err) {
       console.error("JWT was invalid", err);
       res.status(401).json({});
