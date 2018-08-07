@@ -1,6 +1,9 @@
 {
   "name": "functions",
   "description": "Cloud Functions for Firebase",
+  "engines": {
+    "node": ">=8"
+  },
   "scripts": {
     "lint": "eslint .",
     "logs": "firebase functions:log"
@@ -16,11 +19,6 @@
     "jsonwebtoken": "^8.1.0"
   },
   "devDependencies": {
-    "babel-cli": "^6.26.0",
-    "babel-plugin-transform-async-to-generator": "^6.24.1",
-    "babel-plugin-transform-object-rest-spread": "^6.26.0",
-    "babel-plugin-transform-runtime": "^6.23.0",
-    "babel-preset-env": "^1.7.0",
     "eslint": "^4.12.0",
     "eslint-plugin-promise": "^3.6.0"
   },

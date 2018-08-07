@@ -5,7 +5,7 @@
   "scripts": {
     "prepackage-functions": "rimraf functions",
     "package-functions": "babel 'functions_es6' --out-dir 'functions' --copy-files --ignore 'node_modules'",
-    "postpackage-functions": "cp functions_es6/.env functions/ && cd functions && npm install",
+    "postpackage-functions": "cp functions_es6/.env functions/ && cd functions && yarn install",
     "deploy": "npm run package-functions && firebase deploy",
     "preshell": "npm run package-functions",
     "shell": "firebase functions:shell",
@@ -15,10 +15,7 @@
   },
   "author": "",
   "dependencies": {
-    "axios": "^0.18.0",
     "babel-cli": "^6.26.0",
-    "babel-plugin-transform-async-to-generator": "^6.24.1",
-    "babel-plugin-transform-object-rest-spread": "^6.26.0",
     "babel-plugin-transform-runtime": "^6.23.0",
     "babel-preset-env": "^1.7.0",
     "babel-runtime": "^6.26.0",

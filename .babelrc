@@ -2,7 +2,7 @@
   "presets": [
     ["env", {
       "targets": {
-        "node": "6.11"
+        "node": "8"
       }
     }]
   ],
@@ -10,8 +10,6 @@
     ["transform-runtime", {
       "polyfill": true,
       "regenerator": true
-    }],
-    "transform-object-rest-spread",
-    "transform-async-to-generator"
+    }]
   ]
 }
