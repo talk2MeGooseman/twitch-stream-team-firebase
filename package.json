@@ -5,7 +5,7 @@
   "scripts": {
     "prepackage-functions": "rimraf functions",
     "package-functions": "babel 'functions_es6' --out-dir 'functions' --copy-files --ignore 'node_modules'",
-    "postpackage-functions": "cp functions_es6/.env functions/ && cd functions && yarn install",
+    "postpackage-functions": "cp functions_es6/.env functions/ && cd functions && npm install",
     "deploy": "npm run package-functions && firebase deploy",
     "preshell": "npm run package-functions",
     "shell": "firebase functions:shell",

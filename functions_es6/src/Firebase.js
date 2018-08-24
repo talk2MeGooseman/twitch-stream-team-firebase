@@ -2,6 +2,9 @@ import { getTeamInfo, getChannelsTeam } from "./services/TwitchAPI";
 import { shouldRefresh } from "./Helpers";
 
 export const refreshTeam = async (db, teamData) => {
+  if (!teamData) {
+    return;
+  }
   // Check if we need to refresh the team info
   if (shouldRefresh(teamData.refresh_at))
   {
@@ -40,26 +43,25 @@ export const saveTeam = async (db, teamName) => {
 
 export const refreshChannelTeams = async (db, channelData) => {
   // Check if we need to refresh the team info
-  if (shouldRefresh(channelData.refresh_at))
+  console.info('Refresh channels teams', channelData.channel_id);
+  try
   {
-    console.info('Need to refresh channels team', channelData.channel_id);
-    try {
-      // Request Channels Team
-      let channelResponse = await getChannelsTeam(channelData.channel_id);
+    // Request Channels Team
+    let channelResponse = await getChannelsTeam(channelData.channel_id);
 
-      // get the name on all the channels and make a new array
-      let teams = channelResponse.teams.map((selectedTeam) => {
-        return selectedTeam.name;
-      });
+    // get the name on all the channels and make a new array
+    let teams = channelResponse.teams.map((team) => {
+      return team.name;
+    });
 
-      await updateChannelInfo(db, channelData.channel_id, {
-        teams,
-        refresh_at: Date.now(),
-      });
-      console.info('Refresh channels teams', channelData.channel_id);
-    } catch (error) {
-      console.error('Channel info update failed for', channelData.channel_id, error);
-    }
+    await updateChannelInfo(db, channelData.channel_id, {
+      teams,
+      refresh_at: Date.now(),
+    });
+    console.info('Refresh channels teams', channelData.channel_id);
+  } catch (error)
+  {
+    console.error('Channel info update failed for', channelData.channel_id, error);
   }
 }
 
@@ -67,7 +69,7 @@ export const setChannelInfo = async (db, channelId, channelData) => {
   // Get document for channel_id from collection
   const docRef = db.collection("channel").doc(channelId);
   // Set the team name for a channel
-  await docRef.set(channelData);
+  await docRef.set(channelData, { merge: true });
 }
 
 export const updateChannelInfo = async (db, channelId, channelData) => {
@@ -106,4 +108,31 @@ export const setTeamLiveChannels = async (db, teamName, data) => {
   // Set the team live channels info
   await docRef.set(data);
   console.info("Set team live channel info for", teamName);
+}
+
+export const deleteTeamLiveChannels = async (db, teamName) => {
+  console.info("delete team live channels", teamName);
+  // Get document for team from collection
+  db.collection("team_live_channels").doc(teamName).delete();
+}
+
+export const queryCustomTeamInfo = async (db, channel_id) => {
+  // Get info for team for response
+  const docTeamRef = db.collection("custom_team").doc(channel_id);
+
+  let doc = await docTeamRef.get();
+  console.info("Fetched Custom Team", channel_id, "info");
+  return doc.data();
+}
+
+export const setCustomTeam = async (db, channel_id, data) => {
+  console.info('Setting custom team info for', channel_id, data);
+
+  // Get document for team from collection
+  const docRef = db.collection("custom_team").doc(channel_id);
+
+  // Set the team live channels info
+  await docRef.set(data);
+
+  console.info("Set team custom team for channel", channel_id);
 }

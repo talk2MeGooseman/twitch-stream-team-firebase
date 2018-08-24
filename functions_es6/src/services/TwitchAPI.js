@@ -113,3 +113,32 @@ export async function getLiveChannels(channels) {
 
   return response.data;
 }
+
+export async function getChannelsInfo(channel_ids) {
+  let response;
+
+  // let params = channel_ids.reduce((accum, channelId) => {
+  //   if (accum.length === 0) {
+  //     return accum + `login=${channelId}`
+  //   } else {
+  //     return accum + `&login=${channelId}`
+  //   }
+  // }, '');
+
+  try {
+    response = await axios({
+      method: 'GET',
+      url: `https://api.twitch.tv/kraken/users?login=${channel_ids.join(',')}`,
+      headers: {
+        'Client-id': EXTENSION_ID,
+        "Accept": "application/vnd.twitchtv.v5+json",
+      }
+    });
+
+    console.log('Fetch customs channel info', response.data);
+  } catch (error) {
+    console.error('Get Team Info Error:', error);
+  }
+
+  return response.data;
+}
