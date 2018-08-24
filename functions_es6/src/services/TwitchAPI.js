@@ -124,11 +124,12 @@ export async function getChannelsInfo(channel_ids) {
   //     return accum + `&login=${channelId}`
   //   }
   // }, '');
+  let channelNames = channel_ids.map((name) => name.trim());
 
   try {
     response = await axios({
       method: 'GET',
-      url: `https://api.twitch.tv/kraken/users?login=${channel_ids.join(',')}`,
+      url: `https://api.twitch.tv/kraken/users?login=${channelNames.join(',')}`,
       headers: {
         'Client-id': EXTENSION_ID,
         "Accept": "application/vnd.twitchtv.v5+json",
