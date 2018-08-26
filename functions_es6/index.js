@@ -67,7 +67,7 @@ exports.get_panel_information = functions.https.onRequest((req, res) => {
 
     // If there in information for the channel then fetch its team info
     if (channelInfo) {
-      let { teamInfo, customTeam } = await getAllPanelInformation(decoded_token, token, channelInfo);
+      let { teamInfo, customTeam } = await getAllPanelInformation(decoded_token, channelInfo);
 
       res.json({
         teams: channelInfo.teams || [],
@@ -339,7 +339,7 @@ exports.set_custom_team = functions.https.onRequest((req, res) => {
 });
 
 async function getAllPanelInformation(decoded_token, channelInfo) {
-  console.info('Channel', decoded_token.channel_id, 'info found');
+  console.info('Channel info found', channelInfo);
   let teamInfo;
 
   // This can be null if they entered through the custom team flow
