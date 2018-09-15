@@ -4,6 +4,7 @@ import {
   getChannelsTeam,
   getLiveChannels,
   getChannelsInfo,
+  publishChannelMessage,
 } from "./src/services/TwitchAPI";
 import {
   verifyToken,
@@ -22,12 +23,13 @@ import {
   queryCustomTeamInfo,
   setCustomTeam,
   deleteTeamLiveChannels,
+  queryAllChannelsSnapshot,
 } from "./src/Firebase";
-import { shouldRefresh } from "./src/Helpers";
-import { CUSTOM_TEAM_TYPE, TWITCH_TEAM_TYPE } from "./src/Constants";
+import { shouldRefresh, sleep } from "./src/Helpers";
+import { CUSTOM_TEAM_TYPE, TWITCH_TEAM_TYPE, EXTENSTION_USER_ID } from "./src/Constants";
 require('dotenv').config()
 
-// decoded_token.channel_id = "7676884";
+// decoded_token.channel_id = "39849562";
 
 admin.initializeApp(functions.config().firebase);
 let db = admin.firestore();
@@ -67,13 +69,11 @@ exports.get_panel_information = functions.https.onRequest((req, res) => {
 
     // If there in information for the channel then fetch its team info
     if (channelInfo) {
-      let { teamInfo, customTeam } = await getAllPanelInformation(decoded_token, channelInfo);
+      let teamInfo = await getSelectTeamPanelInformation(decoded_token, channelInfo);
 
       res.json({
-        teams: channelInfo.teams || [],
         selectedTeam: teamInfo,
         teamType: channelInfo.team_type,
-        customTeam: customTeam,
       });
     } else {
       res.status(404).end();
@@ -110,13 +110,11 @@ exports.config_get_panel_information = functions.https.onRequest((req, res) => {
 
     // Request Channels Team
     console.info('Find channels', decoded_token.channel_id, 'team info');
-    // let channelTeamsResponse = await getChannelsTeam('7676884');
     let channelTeamsResponse = await getChannelsTeam(decoded_token.channel_id);
 
     // Check if user has a team
     if (channelTeamsResponse.teams.length > 0)
     {
-
       // get the name on all the channels and make a new array
       teams = channelTeamsResponse.teams.map(team => {
         return team.name;
@@ -126,11 +124,9 @@ exports.config_get_panel_information = functions.https.onRequest((req, res) => {
       // from their selected team, then auto select the first one
       if (!selectedTeamName || !teams.includes(selectedTeamName)) {
         selectedTeamData = channelTeamsResponse.teams[0];
-      } else {
-        selectedTeamData = await queryTeamInfo(db, selectedTeamName)
       }
 
-      await fetchAndSaveTeamsInfo(teams, selectedTeamData, res);
+      await fetchAndSaveTeamsInfo(teams, selectedTeamName);
 
       // Set the team name for a channel
       await setChannelInfo(db, decoded_token.channel_id, {
@@ -216,10 +212,67 @@ exports.set_panel_information = functions.https.onRequest((req, res) => {
   });
 });
 
+// Cron service refresh endpoing, pinged once every 5 minutes
+exports.refresh_all_channels_live_info = functions.https.onRequest((req, res) => {
+  // Need to use CORS for Twitch
+  cors(req, res, async () => {
+
+    // Should ASYNC trigger long running job that will publish data to each channel
+    console.info('Publish all channels live information');
+
+    // Get all channels that setup the extension
+    let snapshot = await queryAllChannelsSnapshot(db);
+    // Loop through the channels and fetch the live channel info
+    snapshot.forEach(async channelDoc => {
+      let channelInfo = channelDoc.data();
+      console.info('Publish: Getting live channel info for channel', channelInfo.channel_id);
+
+      let teamInfo, liveTeamID;
+      if (channelInfo.team_type === CUSTOM_TEAM_TYPE)
+      {
+        teamInfo = await queryCustomTeamInfo(db, channelInfo.channel_id);
+        liveTeamID = channelInfo.channel_id;
+      } else {
+        teamInfo = await queryTeamInfo(db, channelInfo.selected_team);
+        liveTeamID = channelInfo.selected_team;
+      }
+
+      let liveChannelsData;
+
+      // Extra layer of protection to avoid hitting rate limit during loop
+      await sleep(10000);
+
+      try
+      {
+        // Query for live channels for team from db
+        liveChannelsData = await getLiveChannelsForTeam(liveTeamID, teamInfo);
+      } catch (error)
+      {
+        console.error('getLiveChannelsForTeam Failed', liveTeamID, error.message);
+        return;
+      }
+
+      // Publish to their channel
+      try {
+        console.info('Publshing', liveTeamID,'channel', channelInfo.channel_id);
+        await publishChannelMessage(channelInfo.channel_id, SECRET, liveChannelsData);
+      } catch (error) {
+        console.error('Error happpened when publishing info to', channelInfo.channel_id);
+        return;
+      }
+    });
+
+    console.log('refresh_all_channels request done');
+    res.status(200).end();
+    return;
+  });
+
+});
 
 exports.get_live_channels = functions.https.onRequest((req, res) => {
   // Need to use CORS for Twitch
   cors(req, res, async () => {
+
     let decoded_token;
 
     // Get JWT from header
@@ -253,17 +306,17 @@ exports.get_live_channels = functions.https.onRequest((req, res) => {
       liveTeamID = teamInfo.name;
     }
 
-    // Create an array of live channel ids
-    let channelIds = teamInfo.users.map((channel) => channel._id);
-
-    // Query for live channels for team from db
-    let liveChannelsData = await queryTeamLiveChannels(db, liveTeamID);
-
-    // check if live channels for team is stale
-    if (!liveChannelsData || shouldRefresh(liveChannelsData.refresh_at)) {
-      // Refresh data before responding back
-      liveChannelsData = await getLiveChannels(channelIds);
-      await setTeamLiveChannels(db, liveTeamID, liveChannelsData)
+    let liveChannelsData;
+    try
+    {
+      // Query for live channels for team from db
+      liveChannelsData = await getLiveChannelsForTeam(liveTeamID, teamInfo);
+    } catch (error)
+    {
+      console.error('Failed get live channel', liveTeamID);
+      res.status(400).json({
+        data: []
+      });
     }
 
     res.json(liveChannelsData);
@@ -338,6 +391,46 @@ exports.set_custom_team = functions.https.onRequest((req, res) => {
   });
 });
 
+async function getLiveChannelsForTeam(liveTeamID, teamInfo) {
+  let liveChannelsData = await queryTeamLiveChannels(db, liveTeamID);
+  // check if live channels for team is stale
+  if (!liveChannelsData || shouldRefresh(liveChannelsData.refresh_at))
+  {
+    // Create an array of live channel ids
+    let channelIds = teamInfo.users.map((channel) => channel._id);
+    // Refresh data before responding back
+    let liveChannelsResponse = await getLiveChannels(channelIds);
+
+    // Strip unneeded values from user objects to reduce data costs
+    let liveChannelsIds = liveChannelsResponse.data.map((channel) => {
+      return channel.user_id;
+    });
+
+     liveChannelsData = await setTeamLiveChannels(db, liveTeamID, liveChannelsIds);
+  }
+
+  return liveChannelsData;
+}
+
+// Get only info for the team the Broadcaster has selected to display
+async function getSelectTeamPanelInformation(decoded_token, channelInfo) {
+  console.info('Channel info found', channelInfo);
+  let teamInfo;
+
+  // This can be null if they entered through the custom team flow
+  if (channelInfo.selected_team)
+  {
+    teamInfo = await queryTeamInfo(db, channelInfo.selected_team);
+  } else {
+    // Get custom team information
+    teamInfo = await queryCustomTeamInfo(db, decoded_token.channel_id);
+  }
+
+
+  return teamInfo;
+}
+
+// Get all information for the panel for configuration view
 async function getAllPanelInformation(decoded_token, channelInfo) {
   console.info('Channel info found', channelInfo);
   let teamInfo;
@@ -359,15 +452,15 @@ async function getAllPanelInformation(decoded_token, channelInfo) {
  * @param {Array} teams 
  * @param {String} selectedTeam 
  */
-async function fetchAndSaveTeamsInfo(teams, selectedTeam) {
-  console.info("Set Channel teams info");
+async function fetchAndSaveTeamsInfo(teams, selectedTeamName) {
+  console.info("Set Channel selected team info", teams);
   let selectedTeamsInfo;
 
   // Fetch and save all the teams in db
   teams.forEach(async (teamName) => {
       let teamInfoResponse = await saveTeam(db, teamName);
       // Respond with first team selected information
-      if (teamInfoResponse.name === selectedTeam.name)
+      if (teamInfoResponse.name === selectedTeamName)
       {
         selectedTeamsInfo = teamInfoResponse;
       }

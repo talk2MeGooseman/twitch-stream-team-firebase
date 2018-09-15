@@ -5,7 +5,7 @@ import {
   EXTENSION_VERSION,
   CONFIG_KEY,
 } from "../Constants";
-import { signToken } from "./TokenUtil";
+import { signToken, signChannelMessageToken } from "./TokenUtil";
 
 export async function setExtensionConfigured(channel_id, secret, version=EXTENSION_VERSION) {
   const token = signToken(secret);
@@ -24,14 +24,12 @@ export async function setExtensionConfigured(channel_id, secret, version=EXTENSI
   });
 }
 
-export async function publishChannelMessage(channel_id, secret) {
+export async function publishChannelMessage(channel_id, secret, data) {
   const token = signChannelMessageToken(channel_id, secret);
 
   // Create payload message, can be anything up to 5kb
   // and 1 message per second per channel
-  const message = JSON.stringify({
-    refresh: true
-  });
+  const message = JSON.stringify(data);
 
   try {
     let response = await axios({
@@ -49,7 +47,7 @@ export async function publishChannelMessage(channel_id, secret) {
       },
     });
   } catch (error) {
-    console.error('PubSub Message failed', error);
+    console.error('PubSub Message failed');
   }
 }
 
@@ -66,7 +64,7 @@ export async function getChannelsTeam(channel_id) {
       }
     });
   } catch (error) {
-    console.error('Get Channel Team Error:', error);
+    console.error('Get Channel Team Error:', channel_id);
   }
 
   return response.data;
@@ -84,19 +82,19 @@ export async function getTeamInfo(team_name) {
       }
     });
   } catch (error) {
-    console.error('Get Team Info Error:', error);
+    console.error('Get Team Info Error:', team_name);
   }
 
   return response.data;
 }
 
 export async function getLiveChannels(channels) {
-  console.info('Check if any of the following channels are live', channels);
+  console.info('Check if any of any channels or live of the', channels.length);
   let channelArgs = channels.map((channel_id) => {
     return `user_id=${channel_id}`;
   });
 
-  let channelParams = channelArgs.join('&'); 
+  let channelParams = channelArgs.slice(0,25).join('&'); 
 
   let response;
   try {
@@ -108,7 +106,10 @@ export async function getLiveChannels(channels) {
       }
     });
   } catch (error) {
-    console.error('Get live channel error:', error);
+    if (error.response) {
+      console.error('Get live channel error');
+      console.error('Error', error.message);
+    }
   }
 
   return response.data;
@@ -136,9 +137,9 @@ export async function getChannelsInfo(channel_ids) {
       }
     });
 
-    console.log('Fetch customs channel info', response.data);
+    console.info('getChannelsInfo', channelNames);
   } catch (error) {
-    console.error('Get Team Info Error:', error);
+    console.error('getChannelsInfo Error:', error);
   }
 
   return response.data;
