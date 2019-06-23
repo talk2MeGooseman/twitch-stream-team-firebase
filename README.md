@@ -1,2 +1,1 @@
-Boilerplate
- TBD to describe repo
+# No longer used, switch to Azure function for infrastructure and updated to TypeScript
